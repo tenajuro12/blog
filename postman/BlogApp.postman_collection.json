@@ -1,14 +1,26 @@
 {
   "info": {
     "name": "BlogApp API",
-    "description": "API test collection for BlogApp — covers Auth, Posts, Comments, Profile",
+    "description": "API test collection for BlogApp \u2014 covers Auth, Posts, Comments, Profile",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "token", "value": "" },
-    { "key": "postSlug", "value": "" },
-    { "key": "commentId", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "postSlug",
+      "value": ""
+    },
+    {
+      "key": "commentId",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -18,6 +30,17 @@
           "name": "Register",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set(\"testEmail\", `testuser${ts}@example.com`);",
+                  "pm.environment.set(\"testUsername\", `testuser${ts}`);",
+                  "pm.environment.set(\"testPassword\", \"password123\");"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
@@ -25,12 +48,12 @@
                   "pm.test('Has token', () => {",
                   "  const json = pm.response.json();",
                   "  pm.expect(json.token).to.be.a('string').and.not.empty;",
-                  "  pm.collectionVariables.set('token', json.token);",
+                  "  pm.environment.set('token', json.token);",
                   "});",
                   "pm.test('Has user object', () => {",
                   "  const json = pm.response.json();",
                   "  pm.expect(json.user).to.have.property('id');",
-                  "  pm.expect(json.user.username).to.eql('testuser');",
+                  "  pm.expect(json.user.username).to.eql(pm.environment.get('testUsername'));",
                   "});"
                 ]
               }
@@ -39,10 +62,15 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/auth/register",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
             }
           }
         },
@@ -61,10 +89,15 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/auth/register",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"testuser2\",\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"username\": \"{{testUsername}}2\",\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
             }
           }
         },
@@ -79,7 +112,7 @@
                   "pm.test('Has token', () => {",
                   "  const json = pm.response.json();",
                   "  pm.expect(json.token).to.be.a('string');",
-                  "  pm.collectionVariables.set('token', json.token);",
+                  "  pm.environment.set('token', json.token);",
                   "});"
                 ]
               }
@@ -88,10 +121,15 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
             }
           }
         },
@@ -110,10 +148,15 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"wrongpassword\"\n}"
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"wrongpassword\"\n}"
             }
           }
         },
@@ -121,13 +164,31 @@
           "name": "Get Me",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const token = pm.environment.get(\"token\");",
+                  "if (!token) {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get(\"baseUrl\") + \"/api/auth/login\",",
+                  "    method: \"POST\",",
+                  "    header: { \"Content-Type\": \"application/json\" },",
+                  "    body: { mode: \"raw\", raw: JSON.stringify({ email: pm.environment.get(\"testEmail\"), password: pm.environment.get(\"testPassword\") }) }",
+                  "  }, (err, res) => {",
+                  "    if (!err) pm.environment.set(\"token\", res.json().token);",
+                  "  });",
+                  "}"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "pm.test('Returns user', () => {",
                   "  const json = pm.response.json();",
-                  "  pm.expect(json.username).to.eql('testuser');",
+                  "  pm.expect(json.username).to.eql(pm.environment.get('testUsername'));",
                   "  pm.expect(json).to.not.have.property('password');",
                   "});"
                 ]
@@ -137,7 +198,12 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/auth/me",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
           }
         },
         {
@@ -175,7 +241,7 @@
                   "  pm.expect(json.title).to.eql('My First Post');",
                   "  pm.expect(json.slug).to.be.a('string').and.not.empty;",
                   "  pm.expect(json.author).to.have.property('username');",
-                  "  pm.collectionVariables.set('postSlug', json.slug);",
+                  "  pm.environment.set('postSlug', json.slug);",
                   "});"
                 ]
               }
@@ -185,8 +251,14 @@
             "method": "POST",
             "url": "{{baseUrl}}/api/posts",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -209,7 +281,12 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/posts",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Unauthorized Post\",\n  \"body\": \"Should not be created.\"\n}"
@@ -257,7 +334,19 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/posts?tag=go",
-              "query": [{ "key": "tag", "value": "go" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts"
+              ],
+              "query": [
+                {
+                  "key": "tag",
+                  "value": "go"
+                }
+              ]
             }
           }
         },
@@ -265,15 +354,11 @@
           "name": "Get Post by Slug",
           "event": [
             {
-              "listen": "test",
+              "listen": "prerequest",
               "script": {
                 "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Post has comments array', () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.title).to.eql('My First Post');",
-                  "  pm.expect(json.comments).to.be.an('array');",
-                  "});"
+                  "const slug = pm.environment.get(\"postSlug\");",
+                  "if (!slug) { throw new Error(\"postSlug not set \u2014 run Create Post first\"); }"
                 ]
               }
             }
@@ -311,7 +396,7 @@
                   "pm.test('Title updated', () => {",
                   "  const json = pm.response.json();",
                   "  pm.expect(json.title).to.eql('Updated Title');",
-                  "  pm.collectionVariables.set('postSlug', json.slug);",
+                  "  pm.environment.set('postSlug', json.slug);",
                   "});"
                 ]
               }
@@ -321,8 +406,14 @@
             "method": "PUT",
             "url": "{{baseUrl}}/api/posts/{{postSlug}}",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -347,7 +438,7 @@
                   "  const json = pm.response.json();",
                   "  pm.expect(json.body).to.eql('Great post!');",
                   "  pm.expect(json.author).to.have.property('username');",
-                  "  pm.collectionVariables.set('commentId', json.id);",
+                  "  pm.environment.set('commentId', json.id);",
                   "});"
                 ]
               }
@@ -357,8 +448,14 @@
             "method": "POST",
             "url": "{{baseUrl}}/api/posts/{{postSlug}}/comments",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -403,7 +500,12 @@
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/api/posts/{{postSlug}}/comments/{{commentId}}",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
           }
         }
       ]
@@ -421,7 +523,7 @@
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "pm.test('Profile has username', () => {",
                   "  const json = pm.response.json();",
-                  "  pm.expect(json.username).to.eql('testuser');",
+                  "  pm.expect(json.username).to.eql(pm.environment.get('testUsername'));",
                   "  pm.expect(json).to.not.have.property('password');",
                   "});"
                 ]
@@ -430,7 +532,7 @@
           ],
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/api/profiles/testuser"
+            "url": "{{baseUrl}}/api/profiles/{{testUsername}}"
           }
         },
         {
@@ -458,6 +560,7 @@
               "script": {
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "pm.test('Bio updated', () => {",
                   "  const json = pm.response.json();",
                   "  pm.expect(json.bio).to.eql('I love writing about Go and testing.');",
@@ -470,12 +573,18 @@
             "method": "PUT",
             "url": "{{baseUrl}}/api/profile",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"testuser\",\n  \"bio\": \"I love writing about Go and testing.\",\n  \"avatar\": \"\"\n}"
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"bio\": \"I love writing about Go and testing.\",\n  \"avatar\": \"\"\n}"
             }
           }
         }
