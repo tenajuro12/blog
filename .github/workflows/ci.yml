@@ -48,11 +48,24 @@ jobs:
           DATABASE_URL: "host=localhost user=postgres password=postgres dbname=blogdb_test port=5432 sslmode=disable"
           JWT_SECRET: "ci-test-secret"
         run: |
-          go test ./tests/... -v -coverprofile=coverage.out -covermode=atomic
+          go test ./tests/... -v -coverprofile=coverage.out -covermode=atomic \
+            -coverpkg=blog-app/handlers,blog-app/utils
 
       - name: Show coverage summary
         working-directory: backend
-        run: go tool cover -func=coverage.out
+        run: go tool cover -func coverage.out
+
+      - name: Check coverage threshold (≥ 50%)
+        working-directory: backend
+        run: |
+          COVERAGE=$(go tool cover -func coverage.out | grep total | awk '{print $3}' | tr -d '%')
+          echo "Total coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 50" | bc -l) )); then
+            echo "❌ Coverage $COVERAGE% is below 50% threshold"
+            exit 1
+          else
+            echo "✅ Coverage $COVERAGE% meets threshold"
+          fi
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -147,6 +160,10 @@ jobs:
         run: |
           newman run postman/BlogApp.postman_collection.json \
             --environment postman/BlogApp.postman_environment.json \
+            --env-var "baseUrl=http://localhost:8080" \
+            --env-var "token=" \
+            --env-var "postSlug=" \
+            --env-var "commentId=" \
             --reporters cli,htmlextra \
             --reporter-htmlextra-export newman-report.html \
             --bail
@@ -188,3 +205,54 @@ jobs:
         with:
           name: frontend-build
           path: frontend/build/
+
+  # ── Alerting: notify on failure ─────────────────────────────────────────────
+  notify-on-failure:
+    name: Failure Notification
+    runs-on: ubuntu-latest
+    needs: [backend-tests, backend-build, api-tests, frontend-build]
+    # Only runs when any job fails, not on success
+    if: failure()
+
+    steps:
+      - name: Collect failure info
+        id: info
+        run: |
+          echo "REPO=${{ github.repository }}" >> $GITHUB_OUTPUT
+          echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "COMMIT=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "AUTHOR=${{ github.actor }}" >> $GITHUB_OUTPUT
+          echo "RUN_URL=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Send failure email via GitHub Actions
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ CI Failed — ${{ github.repository }} @ ${{ github.ref_name }}"
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: "CI Pipeline <${{ secrets.MAIL_USERNAME }}>"
+          body: |
+            CI pipeline failed for Inkwell Blog Application.
+
+            Repository : ${{ github.repository }}
+            Branch     : ${{ github.ref_name }}
+            Commit     : ${{ github.sha }}
+            Author     : ${{ github.actor }}
+            Trigger    : ${{ github.event_name }}
+
+            Failed jobs:
+            - backend-tests : ${{ needs.backend-tests.result }}
+            - backend-build : ${{ needs.backend-build.result }}
+            - api-tests     : ${{ needs.api-tests.result }}
+            - frontend-build: ${{ needs.frontend-build.result }}
+
+            View full logs and artifacts:
+            ${{ steps.info.outputs.RUN_URL }}
+
+            ---
+            This is an automated message from the QA pipeline.
+            To stop receiving these alerts, update the NOTIFY_EMAIL secret in GitHub repository settings.
