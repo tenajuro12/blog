@@ -16,7 +16,7 @@ func InitDB(dsn string) {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
-	err = DB.AutoMigrate(&User{}, &Post{}, &Comment{})
+	err = DB.AutoMigrate(&User{}, &Post{}, &Comment{}, &Follow{}, &Like{}, &Tag{}, &Bookmark{})
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}

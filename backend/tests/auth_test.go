@@ -22,7 +22,7 @@ func setupTestDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open test db: %v", err)
 	}
-	if err := models.DB.AutoMigrate(&models.User{}, &models.Post{}, &models.Comment{}); err != nil {
+	if err := models.DB.AutoMigrate(&models.User{}, &models.Post{}, &models.Comment{}, &models.Like{}, &models.Follow{}, &models.Tag{}, &models.Bookmark{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	utils.InitJWT("test-secret")
