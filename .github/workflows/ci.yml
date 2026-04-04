@@ -224,35 +224,14 @@ jobs:
           echo "AUTHOR=${{ github.actor }}" >> $GITHUB_OUTPUT
           echo "RUN_URL=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
 
-      - name: Send failure email via GitHub Actions
-        uses: dawidd6/action-send-mail@v3
+      - name: Send Telegram alert
+        uses: appleboy/telegram-action@master
         with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "❌ CI Failed — ${{ github.repository }} @ ${{ github.ref_name }}"
-          to: ${{ secrets.NOTIFY_EMAIL }}
-          from: "CI Pipeline <${{ secrets.MAIL_USERNAME }}>"
-          body: |
-            CI pipeline failed for Inkwell Blog Application.
-
-            Repository : ${{ github.repository }}
-            Branch     : ${{ github.ref_name }}
-            Commit     : ${{ github.sha }}
-            Author     : ${{ github.actor }}
-            Trigger    : ${{ github.event_name }}
-
-            Failed jobs:
-            - backend-tests : ${{ needs.backend-tests.result }}
-            - backend-build : ${{ needs.backend-build.result }}
-            - api-tests     : ${{ needs.api-tests.result }}
-            - frontend-build: ${{ needs.frontend-build.result }}
-
-            View full logs and artifacts:
-            ${{ steps.info.outputs.RUN_URL }}
-
-            ---
-            This is an automated message from the QA pipeline.
-            To stop receiving these alerts, update the NOTIFY_EMAIL secret in GitHub repository settings.
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ CI Failed — ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            Logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
