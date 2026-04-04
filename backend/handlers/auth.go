@@ -55,7 +55,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{
+	utils.JSON(w, http.StatusCreated, map[string]interface{}{
 		"token": token,
 		"user":  user,
 	})
@@ -85,7 +85,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{
+	utils.JSON(w, http.StatusCreated, map[string]interface{}{
 		"token": token,
 		"user":  user,
 	})
