@@ -7,11 +7,10 @@ on:
     branches: [main]
 
 jobs:
-  # ── Backend: Go unit tests ──────────────────────────────────────────────────
-  backend-tests:
-    name: Go Unit Tests
+  # ── 1. Unit Tests ────────────────────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:16-alpine
@@ -28,8 +27,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -48,36 +46,144 @@ jobs:
           DATABASE_URL: "host=localhost user=postgres password=postgres dbname=blogdb_test port=5432 sslmode=disable"
           JWT_SECRET: "ci-test-secret"
         run: |
-          go test ./tests/... -v -coverprofile=coverage.out -covermode=atomic \
+          go test ./tests/... -v -run "^Test[^(Integration|Edge|Concurrency|InvalidBehavior)]" \
+            -coverprofile=coverage_unit.out \
+            -covermode=atomic \
             -coverpkg=blog-app/handlers,blog-app/utils
 
-      - name: Show coverage summary
+      - name: Show unit coverage
         working-directory: backend
-        run: go tool cover -func coverage.out
+        run: go tool cover -func coverage_unit.out | tail -3
 
-      - name: Check coverage threshold (≥ 50%)
+      - name: Enforce coverage threshold ≥ 50%
         working-directory: backend
         run: |
-          COVERAGE=$(go tool cover -func coverage.out | grep total | awk '{print $3}' | tr -d '%')
-          echo "Total coverage: $COVERAGE%"
+          COVERAGE=$(go tool cover -func coverage_unit.out | grep total | awk '{print $3}' | tr -d '%')
+          echo "Unit coverage: $COVERAGE%"
           if (( $(echo "$COVERAGE < 50" | bc -l) )); then
-            echo "❌ Coverage $COVERAGE% is below 50% threshold"
+            echo "❌ Coverage $COVERAGE% is below 50%"
             exit 1
-          else
-            echo "✅ Coverage $COVERAGE% meets threshold"
           fi
+          echo "✅ Coverage $COVERAGE% passed"
 
-      - name: Upload coverage report
+      - name: Upload unit coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: backend/coverage.out
+          name: coverage-unit
+          path: backend/coverage_unit.out
 
-  # ── Backend: Build check ────────────────────────────────────────────────────
+  # ── 2. Integration Tests ──────────────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Install dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Run integration tests
+        working-directory: backend
+        env:
+          JWT_SECRET: "ci-test-secret"
+        run: |
+          go test ./tests/... -v -run "^TestIntegration_" \
+            -coverprofile=coverage_integration.out \
+            -covermode=atomic \
+            -coverpkg=blog-app/handlers,blog-app/utils
+
+      - name: Show integration coverage
+        working-directory: backend
+        run: go tool cover -func coverage_integration.out | tail -3
+
+      - name: Upload integration coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: backend/coverage_integration.out
+
+  # ── 3. Edge Case Tests ────────────────────────────────────────────────────────
+  edge-tests:
+    name: Edge Case Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Install dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Run edge case tests
+        working-directory: backend
+        env:
+          JWT_SECRET: "ci-test-secret"
+        run: |
+          go test ./tests/... -v -run "^TestEdge_" \
+            -coverprofile=coverage_edge.out \
+            -covermode=atomic \
+            -coverpkg=blog-app/handlers,blog-app/utils
+
+      - name: Upload edge coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-edge
+          path: backend/coverage_edge.out
+
+  # ── 4. Concurrency + Invalid Behavior Tests ───────────────────────────────────
+  concurrency-tests:
+    name: Concurrency & Invalid Behavior Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Install dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Run concurrency tests with race detector
+        working-directory: backend
+        env:
+          JWT_SECRET: "ci-test-secret"
+        run: |
+          go test ./tests/... -v \
+            -run "^(TestConcurrency_|TestInvalidBehavior_)" \
+            -race \
+            -count=1 \
+            -timeout=60s
+
+  # ── 5. Build ──────────────────────────────────────────────────────────────────
   backend-build:
     name: Go Build
     runs-on: ubuntu-latest
-    needs: backend-tests
+    needs: [unit-tests, integration-tests, edge-tests, concurrency-tests]
 
     steps:
       - uses: actions/checkout@v4
@@ -99,9 +205,9 @@ jobs:
           name: blog-app-binary
           path: backend/bin/blog-app
 
-  # ── API tests with Newman ───────────────────────────────────────────────────
+  # ── 6. API Tests (Newman) ─────────────────────────────────────────────────────
   api-tests:
-    name: Newman API Tests
+    name: Newman API + Integration Tests
     runs-on: ubuntu-latest
     needs: backend-build
 
@@ -142,7 +248,7 @@ jobs:
           PORT: "8080"
         run: |
           go run main.go &
-          echo "Waiting for server to start..."
+          echo "Waiting for server..."
           for i in {1..15}; do
             curl -s http://localhost:8080/api/posts && break
             sleep 2
@@ -156,7 +262,7 @@ jobs:
       - name: Install Newman
         run: npm install -g newman newman-reporter-htmlextra
 
-      - name: Run Postman collection
+      - name: Run all Newman folders
         run: |
           newman run postman/BlogApp.postman_collection.json \
             --environment postman/BlogApp.postman_environment.json \
@@ -175,7 +281,7 @@ jobs:
           name: newman-report
           path: newman-report.html
 
-  # ── Frontend: Build check ───────────────────────────────────────────────────
+  # ── 7. Frontend Build ─────────────────────────────────────────────────────────
   frontend-build:
     name: React Build
     runs-on: ubuntu-latest
@@ -200,30 +306,27 @@ jobs:
           CI: false
         run: npm run build
 
-      - name: Upload build artifact
+      - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: frontend/build/
 
-  # ── Alerting: notify on failure ─────────────────────────────────────────────
+  # ── 8. Notify on failure ──────────────────────────────────────────────────────
   notify-on-failure:
     name: Failure Notification
     runs-on: ubuntu-latest
-    needs: [backend-tests, backend-build, api-tests, frontend-build]
-    # Only runs when any job fails, not on success
+    needs:
+      - unit-tests
+      - integration-tests
+      - edge-tests
+      - concurrency-tests
+      - backend-build
+      - api-tests
+      - frontend-build
     if: failure()
 
     steps:
-      - name: Collect failure info
-        id: info
-        run: |
-          echo "REPO=${{ github.repository }}" >> $GITHUB_OUTPUT
-          echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          echo "COMMIT=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "AUTHOR=${{ github.actor }}" >> $GITHUB_OUTPUT
-          echo "RUN_URL=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
-
       - name: Send Telegram alert
         uses: appleboy/telegram-action@master
         with:
@@ -231,7 +334,19 @@ jobs:
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
             ❌ CI Failed — ${{ github.repository }}
-            Branch: ${{ github.ref_name }}
-            Commit: ${{ github.sha }}
-            Author: ${{ github.actor }}
+
+            Branch : ${{ github.ref_name }}
+            Commit : ${{ github.sha }}
+            Author : ${{ github.actor }}
+            Trigger: ${{ github.event_name }}
+
+            Job results:
+            unit-tests        → ${{ needs.unit-tests.result }}
+            integration-tests → ${{ needs.integration-tests.result }}
+            edge-tests        → ${{ needs.edge-tests.result }}
+            concurrency-tests → ${{ needs.concurrency-tests.result }}
+            backend-build     → ${{ needs.backend-build.result }}
+            api-tests         → ${{ needs.api-tests.result }}
+            frontend-build    → ${{ needs.frontend-build.result }}
+
             Logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
