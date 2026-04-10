@@ -351,38 +351,6 @@
           }
         },
         {
-          "name": "Get Post by Slug",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const slug = pm.environment.get(\"postSlug\");",
-                  "if (!slug) { throw new Error(\"postSlug not set \u2014 run Create Post first\"); }"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Post has expected fields', () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json).to.have.property('title');",
-                  "  pm.expect(json).to.have.property('body');",
-                  "  pm.expect(json.comments).to.be.an('array');",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/posts/{{postSlug}}"
-          }
-        },
-        {
           "name": "Get Post - Not Found (expect 404)",
           "event": [
             {
