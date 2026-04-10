@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const ThemeContext = createContext(null);
-
 export const themes = {
   dark: {
     bg: '#08080c',
@@ -45,6 +43,8 @@ export const themes = {
   },
 };
 
+const ThemeContext = createContext({ theme: themes.dark, mode: 'dark', toggle: () => {} });
+
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(() => localStorage.getItem('theme') || 'dark');
   const theme = themes[mode];
@@ -62,9 +62,9 @@ export function ThemeProvider({ children }) {
   }, [theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, mode, toggle }}>
-      {children}
-    </ThemeContext.Provider>
+      <ThemeContext.Provider value={{ theme, mode, toggle }}>
+        {children}
+      </ThemeContext.Provider>
   );
 }
 

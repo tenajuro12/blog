@@ -28,6 +28,10 @@ run-backend:
 test-api:
 	newman run postman/BlogApp.postman_collection.json \
 		--environment postman/BlogApp.postman_environment.json \
+		--env-var "baseUrl=http://localhost:8080" \
+		--env-var "token=" \
+		--env-var "postSlug=" \
+		--env-var "commentId=" \
 		--reporters cli
 
 ## Run Newman with HTML report

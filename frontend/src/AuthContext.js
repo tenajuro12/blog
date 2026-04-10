@@ -11,12 +11,12 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('token');
     if (token) {
       getMe()
-          .then((res) => setUser(res.data))
-          .catch(() => {
-            // Only remove token on 401, not on network errors
-            localStorage.removeItem('token');
-          })
-          .finally(() => setLoading(false));
+        .then((res) => setUser(res.data))
+        .catch(() => {
+          // Only remove token on 401, not on network errors
+          localStorage.removeItem('token');
+        })
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
@@ -34,9 +34,9 @@ export function AuthProvider({ children }) {
   };
 
   return (
-      <AuthContext.Provider value={{ user, setUser, signin, signout, loading }}>
-        {children}
-      </AuthContext.Provider>
+    <AuthContext.Provider value={{ user, setUser, signin, signout, loading }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

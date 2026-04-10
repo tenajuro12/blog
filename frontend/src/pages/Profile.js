@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProfile, getUserPosts, updateProfile } from '../api';
+import { getProfile, getUserPosts, updateProfile, followUser, unfollowUser, getFollowers } from '../api';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
 
@@ -14,6 +14,8 @@ export default function Profile() {
   const [form, setForm] = useState({ username: '', bio: '', avatar: '' });
   const [error, setError] = useState('');
   const [visible, setVisible] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
 
   useEffect(() => {
     setVisible(false);
@@ -21,8 +23,27 @@ export default function Profile() {
       setProfile(res.data);
       setForm({ username: res.data.username, bio: res.data.bio || '', avatar: res.data.avatar || '' });
       getUserPosts(res.data.id).then(r => { setPosts(r.data); setTimeout(() => setVisible(true), 50); });
+      // get followers to check follow status and count
+      getFollowers(res.data.id).then(r => {
+        const followers = r.data || [];
+        setFollowerCount(followers.length);
+        if (user) setFollowing(followers.some(f => f.id === user.id));
+      });
     });
-  }, [username]);
+  }, [username, user]);
+
+  const handleFollow = async () => {
+    if (!profile) return;
+    if (following) {
+      await unfollowUser(profile.id);
+      setFollowing(false);
+      setFollowerCount(c => c - 1);
+    } else {
+      await followUser(profile.id);
+      setFollowing(true);
+      setFollowerCount(c => c + 1);
+    }
+  };
 
   const handleSave = async () => {
     try { const res = await updateProfile(form); setProfile(res.data); setUser(res.data); setEditing(false); setError(''); }
@@ -63,7 +84,11 @@ export default function Profile() {
                 {profile.bio && <p style={{ color: theme.textSecondary, fontSize: 16, lineHeight: 1.6, marginBottom: 16, fontWeight: 300, maxWidth: 480 }}>{profile.bio}</p>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
                   <span style={{ fontSize: 13, color: theme.textMuted }}>{posts.length} {posts.length === 1 ? 'story' : 'stories'}</span>
-                  {isOwner && <button onClick={() => setEditing(true)} style={{ background: 'none', border: `1px solid ${theme.borderStrong}`, color: theme.textSecondary, borderRadius: 6, padding: '6px 16px', cursor: 'pointer', fontSize: 12, letterSpacing: 0.5, fontFamily: "'DM Sans', sans-serif" }}>Edit profile</button>}
+                  <span style={{ fontSize: 13, color: theme.textMuted }}>{followerCount} {followerCount === 1 ? 'follower' : 'followers'}</span>
+                  {isOwner
+                    ? <button onClick={() => setEditing(true)} style={{ background: 'none', border: `1px solid ${theme.borderStrong}`, color: theme.textSecondary, borderRadius: 6, padding: '6px 16px', cursor: 'pointer', fontSize: 12, letterSpacing: 0.5, fontFamily: "'DM Sans', sans-serif" }}>Edit profile</button>
+                    : user && <button onClick={handleFollow} style={{ background: following ? theme.accentLight : 'none', border: `1px solid ${following ? theme.accent : theme.borderStrong}`, color: following ? theme.accent : theme.textSecondary, borderRadius: 20, padding: '6px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s' }}>{following ? '✓ Following' : '+ Follow'}</button>
+                  }
                 </div>
               </>
             )}
