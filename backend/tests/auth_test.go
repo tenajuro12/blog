@@ -105,7 +105,7 @@ func TestLogin_Success(t *testing.T) {
 		"password": "secret",
 	})
 
-	if rr.Code != http.StatusOK {
+	if rr.Code != http.StatusCreated {
 		t.Errorf("expected 200, got %d — body: %s", rr.Code, rr.Body.String())
 	}
 
